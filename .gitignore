@@ -1,0 +1,11 @@
+# Credenciais -- NUNCA commitar
+.env
+local.settings.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Azure Functions
+.python_packages/
