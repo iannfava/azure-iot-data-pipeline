@@ -25,33 +25,33 @@ O pipeline batch é responsável por ingerir dados históricos de produção (CS
 
 O pipeline `pl_raw_to_bronze` copia os arquivos brutos para a camada Raw do Data Lake e dispara a primeira transformação. Abaixo, o histórico de execuções mostrando processamento bem-sucedido de ponta a ponta:
 
-`[PRINT 1: Pipeline runs — 3 execuções pl_raw_to_bronze, status Succeeded]`
+![Pipeline runs no Data Factory, 3 execuções com status Succeeded](docs/images/01-pipeline-runs-data-factory.png)
 
 Além do Data Factory, o próprio Synapse orquestra um pipeline interno (`pipeline_batch_industry_4_0`) que encadeia visualmente cada etapa da transformação — leitura, metadados, processamento por linha (ForEach), e carga final via stored procedure:
 
-`[PRINT 1b: Visão gráfica do pipeline_batch_industry_4_0 no Synapse — raw_bronze → Get Metadata → ForEach → bronze_silver → silver_gold → Stored procedure]`
+![Visão gráfica do pipeline_batch_industry_4_0 no Synapse](docs/images/02-pipeline-grafico-synapse.png)
 
 ### Armazenamento em camadas (Azure Data Lake Storage)
 
 Os dados são organizados fisicamente em três camadas dentro do container `inicial-datalake`, cada uma representando um estágio de maturidade dos dados:
 
-`[PRINT 2: Estrutura de pastas RAW/BRONZE/SILVER]`
+![Estrutura de pastas RAW/BRONZE/SILVER no Data Lake](docs/images/03-datalake-estrutura-camadas.png)
 
 ### Transformação e modelagem dimensional (Azure Synapse Analytics)
 
 A transformação final ocorre em notebooks PySpark no Synapse, organizados em três etapas sequenciais (`01_raw_to_bronze`, `02_bronze_to_silver`, `03_silver_to_gold`). A última etapa lê os dados validados da camada Silver:
 
-`[PRINT 3a: Notebook 03_silver_to_gold — leitura da Silver, "Linhas na silver: 168"]`
+![Notebook 03_silver_to_gold lendo a camada Silver](docs/images/04-notebook-silver-to-gold-leitura.png)
 
 ...e constrói o modelo final em Gold: dimensões carregadas via overwrite simples (baixa cardinalidade) e a tabela fato `gold.fact_producao` atualizada via upsert incremental, usando a chave de negócio (`sk_linha + sk_maquina + sk_data`) para garantir que reprocessamentos atrasados não dupliquem registros:
 
-`[PRINT 3b: DDL da tabela fato + confirmação "OK - dimensoes gravadas direto em gold, fato via staging + upsert"]`
+![DDL da tabela fato e confirmação de execução do notebook](docs/images/05-notebook-silver-to-gold-ddl-confirmacao.png)
 
 ### Resultado final consultável (Azure SQL Database)
 
 Os dados transformados ficam disponíveis para consumo (dashboards, APIs) na tabela `gold.fact_producao`, com métricas de produção já calculadas:
 
-`[PRINT 4: Query SELECT TOP 10 * FROM gold.fact_producao com resultado real]`
+![Query SELECT TOP 10 * FROM gold.fact_producao com resultado real](docs/images/06-sql-gold-fact-producao.png)
 
 ---
 
@@ -63,13 +63,13 @@ O pipeline real-time captura telemetria simulada de sensores das máquinas da f�
 
 8 devices simulando máquinas da fábrica (M01–M03 → Linha 1, M04–M06 → Linha 2, M07–M08 → Linha 3), registrados e habilitados no IoT Hub:
 
-`[PRINT 5: Lista de devices M01-M08, todos Enabled]`
+![Lista de devices M01-M08 no IoT Hub, todos Enabled](docs/images/07-iot-hub-devices.png)
 
 ### Telemetria bruta no Data Explorer (Azure Data Explorer / Kusto)
 
 Os dados de sensor (temperatura, vibração, RPM) chegam na tabela `TelemetriaMaquinas`, com granularidade de série temporal (`id_maquina`, `linha_producao`, `timestamp`):
 
-`[PRINT 6: Query KQL "TelemetriaMaquinas | take 10" com 10 registros reais de telemetria]`
+![Query KQL TelemetriaMaquinas com 10 registros reais de telemetria](docs/images/08-data-explorer-telemetria-kql.png)
 
 > Nota operacional: o cluster Data Explorer cobra por tempo de compute mesmo ocioso, então fica parado (Stopped) por padrão e só é ligado sob demanda para ingestão/consulta — lição aprendida após um incidente de custo (ver seção "Decisões técnicas e lições aprendidas").
 
@@ -77,7 +77,7 @@ Os dados de sensor (temperatura, vibração, RPM) chegam na tabela `TelemetriaMa
 
 A telemetria bruta é agregada diariamente por máquina e disponibilizada na tabela `gold.condicao_maquina_diaria`, com médias de temperatura, vibração e RPM prontas para consumo:
 
-`[PRINT 7: Query SELECT TOP 10 * FROM gold.condicao_maquina_diaria com resultado real]`
+![Query SELECT TOP 10 * FROM gold.condicao_maquina_diaria com resultado real](docs/images/09-sql-gold-condicao-maquina-diaria.png)
 
 ---
 
