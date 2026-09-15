@@ -83,11 +83,30 @@ A telemetria bruta é agregada diariamente por máquina e disponibilizada na tab
 
 ## API: Azure Functions
 
-*(seção em construção — bloqueio conhecido documentado abaixo)*
+*(código completo e testado localmente com dados reais — deploy na nuvem pendente, ver detalhes abaixo)*
 
-Durante a criação da Function App, o portal Azure não exibia mais a opção clássica de plano Consumption (Linux) como card visual — apenas "Flex Consumption" (não suportado em conta Free Trial) e "Consumption (Windows)" (sem suporte a runtime Python). Após diagnóstico com `az functionapp create --debug`, foi identificado que o erro de rede (`ConnectionResetError`) ocorria numa chamada específica (`functionAppStacks`) que baixa um catálogo grande, provavelmente por limitação de rede local. Confirmado com o professor do curso que o plano Linux Consumption clássico ainda existe e pode ser criado via CLI/Bicep (descontinuação prevista para 2028), apesar de ausente do formulário visual.
+### Bloqueio inicial e resolução
 
-Solução preparada: `function-app.bicep`, criando a Function App diretamente via ARM/Bicep, contornando a chamada problemática.
+Durante a criação da Function App, o portal Azure não exibia mais a opção clássica de plano Consumption (Linux) como card visual — apenas "Flex Consumption" (não suportado em conta Free Trial) e "Consumption (Windows)" (sem suporte a runtime Python). Após diagnóstico com `az functionapp create --debug`, foi identificado que o erro de rede (`ConnectionResetError`) ocorria numa chamada específica (`functionAppStacks`) que baixa um catálogo grande, provavelmente por limitação de rede local.
+
+A resolução definitiva veio do upgrade da assinatura de Free Trial para Pay-As-You-Go (mantendo o crédito promocional intacto até a data de expiração original) — isso removeu a restrição de "Flex Consumption não suportado em conta trial", permitindo criar a Function App pelo fluxo padrão do portal.
+
+### Status atual
+
+- ✅ Function App criada no portal (plano Flex Consumption, runtime Python 3.13, Linux)
+- ✅ Código local com as 3 rotas HTTP (`producao-resumo`, `condicao-maquina`, `saude-linha`), credenciais via variável de ambiente (nunca hardcoded, com referência preparada para Key Vault)
+- ✅ Testado localmente (`func start` + Azurite como emulador de storage) — as 3 rotas respondendo com dados reais do SQL Gold, incluindo join entre produção e condição de máquina na rota combinada
+- ⬜ Deploy para a nuvem pendente — bloqueado por `ConnectionResetError` de rede ao tentar publicar via `az functionapp deployment source config-zip` (mesmo padrão de erro observado no bloqueio inicial), sugerindo interferência de rede local/antivírus/provedor, não um problema de código ou conta. Diagnóstico planejado: testar em rede diferente (hotspot) para confirmar a causa.
+
+### Nota técnica: caminho de deploy
+
+O plano original era publicar via extensão Azure Functions do VS Code, seguindo o mesmo fluxo do curso. Dois obstáculos técnicos levaram a uma rota alternativa:
+1. A extensão do VS Code apresentou erro persistente ao listar assinaturas disponíveis (`select a subscription` vazio)
+2. O login do Azure CLI travava silenciosamente (janela de seleção de conta fechava sem completar) — causa identificada como bug conhecido do broker WAM do Windows, resolvido com `az config set core.enable_broker_on_windows=false`
+
+Com o login resolvido, o deploy foi tentado via `az functionapp deployment source config-zip` (empacotando o código em `.zip`), mas esbarrou no `ConnectionResetError` de rede mencionado acima.
+
+`[PRINT 8 — quando o deploy for concluído: teste dos 3 endpoints públicos respondendo com dado real]`
 
 ---
 

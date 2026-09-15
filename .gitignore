@@ -9,3 +9,15 @@ __pycache__/
 
 # Azure Functions
 .python_packages/
+
+# Azurite (emulador de storage local)
+__azurite_db_*__.json
+__blobstorage__/
+__queuestorage__/
+AzuriteConfig
+
+# VS Code
+.vscode/
+
+# Deploy temporário
+deploy.zip
