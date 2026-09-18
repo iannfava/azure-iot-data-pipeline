@@ -83,7 +83,13 @@ A telemetria bruta é agregada diariamente por máquina e disponibilizada na tab
 
 ## API: Azure Functions
 
-*(código completo e testado localmente com dados reais — deploy na nuvem pendente, ver detalhes abaixo)*
+A camada de exposição de dados do projeto é uma Azure Function App (`blueprint-azure`, plano Flex Consumption, Linux, Python 3.13) com 3 rotas HTTP que consultam o SQL Gold gerado pelo pipeline Synapse:
+
+- `GET /api/producao-resumo?linha=L1` — resumo de produção por linha, com detalhe por dia e máquina
+- `GET /api/condicao-maquina?id_maquina=M01` — última leitura de condição (temperatura, vibração, rpm) de uma máquina
+- `GET /api/saude-linha?linha=L1` — visão combinada de produção + condição das máquinas de uma linha
+
+Autenticação via credencial de função (`AuthLevel.FUNCTION`) e conexão ao SQL via `pymssql`, escolhido por não depender de driver de sistema operacional — funciona direto no Linux Consumption plan sem configuração extra. Credenciais do banco nunca ficam em texto plano no código: são lidas de variáveis de ambiente (Application Settings), com o padrão do código já preparado para receber uma referência direta ao Key Vault (`@Microsoft.KeyVault(SecretUri=...)`) caso a rotação de segredo seja aplicada aqui no futuro.
 
 ### Bloqueio inicial e resolução
 
@@ -91,22 +97,66 @@ Durante a criação da Function App, o portal Azure não exibia mais a opção c
 
 A resolução definitiva veio do upgrade da assinatura de Free Trial para Pay-As-You-Go (mantendo o crédito promocional intacto até a data de expiração original) — isso removeu a restrição de "Flex Consumption não suportado em conta trial", permitindo criar a Function App pelo fluxo padrão do portal.
 
+### Deploy: do código local à nuvem
+
+O plano original era publicar via extensão Azure Functions do VS Code, seguindo o mesmo fluxo do curso. Dois obstáculos técnicos precisaram ser resolvidos antes do primeiro deploy bem-sucedido:
+
+1. A extensão do VS Code apresentou erro persistente ao listar assinaturas disponíveis (`select a subscription` vazio) — resolvido ao autenticar a conta diretamente dentro da extensão (painel lateral **Azure → Resources → Sign in to Tenant**), um login independente do `az login` do terminal.
+2. O login do Azure CLI travava silenciosamente (janela de seleção de conta fechava sem completar) — causa identificada como bug conhecido do broker WAM do Windows, resolvido com `az config set core.enable_broker_on_windows=false`.
+
+Com o login da extensão resolvido, o primeiro deploy foi concluído tecnicamente com sucesso — mas publicando o **projeto errado**.
+
+### Troubleshooting: deploy publicando o projeto errado
+
+O workspace local chegou a ter duas pastas de function app: `api_projeto_final` (o código real, com as 3 rotas) e `api_function_project` (um projeto de exemplo criado ao seguir uma aula do curso, com uma rota HTTP genérica de "Hello, {name}"). Mesmo com `api_projeto_final` corretamente marcado como projeto padrão do workspace na extensão, o comando **"Deploy to Azure"** publicava repetidamente o projeto de exemplo:
+
+![Function App só com a rota de exemplo publicada](docs/images/10-api-antes-deploy-errado.png)
+
+A causa raiz estava em `.vscode/settings.json`: a extensão usa duas chaves de configuração distintas — `projectSubpath` (qual pasta é reconhecida como o projeto do workspace) e `deploySubpath` (qual pasta é efetivamente publicada no deploy). A primeira estava correta; a segunda tinha ficado presa no valor da pasta de exemplo desde a criação inicial da function app pela extensão, e nunca foi atualizada:
+
+```jsonc
+// antes
+"azureFunctions.deploySubpath": "api_function_project",
+"azureFunctions.projectSubpath": "api_projeto_final"
+
+// depois
+"azureFunctions.deploySubpath": "api_projeto_final",
+"azureFunctions.projectSubpath": "api_projeto_final"
+```
+
+Corrigido o `deploySubpath` — e removida a pasta de exemplo do repositório, já sem uso —, o deploy passou a publicar o código certo, confirmado pelas 3 rotas reais aparecendo na Function App:
+
+![Function App com as 3 rotas reais publicadas](docs/images/11-api-depois-deploy-correto.png)
+
+### Troubleshooting: erro 500 por variáveis de ambiente ausentes na nuvem
+
+Com o código certo publicado, as 3 rotas retornavam erro 500. O `local.settings.json` (usado só em testes locais, nunca enviado no deploy por estar no `.gitignore`) tinha as credenciais do SQL corretas, mas a Function App na nuvem não tinha nenhuma variável de ambiente própria da aplicação cadastrada — só as de infraestrutura criadas automaticamente pelo Azure (Application Insights, Storage).
+
+Como `SQL_USER` e `SQL_PASSWORD` não têm valor padrão no código (diferente de `SQL_SERVER` e `SQL_DATABASE`, que têm), a função tentava conectar ao SQL Server com usuário e senha vazios, falhando com 500 em qualquer uma das 3 rotas. Resolvido cadastrando as variáveis em **Function App → Settings → Environment variables**, com os mesmos valores usados localmente.
+
+### Resultado: as 3 rotas respondendo com dado real
+
+**`condicao-maquina?id_maquina=M01`**
+
+![Teste da rota condicao-maquina retornando 200 OK](docs/images/12-api-teste-condicao-maquina.png)
+
+**`producao-resumo?linha=L1`**
+
+![Teste da rota producao-resumo retornando 200 OK](docs/images/13-api-teste-producao-resumo.png)
+
+**`saude-linha?linha=L2`**
+
+![Teste da rota saude-linha retornando 200 OK](docs/images/14-api-teste-saude-linha.png)
+
+Os testes acima foram feitos pelo painel **Code + Test → Test/Run** do próprio portal Azure, que autentica com a host key da função automaticamente — uma forma prática de validar o endpoint sem expor a URL pública (que carrega a chave de acesso na query string) em capturas de tela.
+
 ### Status atual
 
-- ✅ Function App criada no portal (plano Flex Consumption, runtime Python 3.13, Linux)
-- ✅ Código local com as 3 rotas HTTP (`producao-resumo`, `condicao-maquina`, `saude-linha`), credenciais via variável de ambiente (nunca hardcoded, com referência preparada para Key Vault)
-- ✅ Testado localmente (`func start` + Azurite como emulador de storage) — as 3 rotas respondendo com dados reais do SQL Gold, incluindo join entre produção e condição de máquina na rota combinada
-- ⬜ Deploy para a nuvem pendente — bloqueado por `ConnectionResetError` de rede ao tentar publicar via `az functionapp deployment source config-zip` (mesmo padrão de erro observado no bloqueio inicial), sugerindo interferência de rede local/antivírus/provedor, não um problema de código ou conta. Diagnóstico planejado: testar em rede diferente (hotspot) para confirmar a causa.
-
-### Nota técnica: caminho de deploy
-
-O plano original era publicar via extensão Azure Functions do VS Code, seguindo o mesmo fluxo do curso. Dois obstáculos técnicos levaram a uma rota alternativa:
-1. A extensão do VS Code apresentou erro persistente ao listar assinaturas disponíveis (`select a subscription` vazio)
-2. O login do Azure CLI travava silenciosamente (janela de seleção de conta fechava sem completar) — causa identificada como bug conhecido do broker WAM do Windows, resolvido com `az config set core.enable_broker_on_windows=false`
-
-Com o login resolvido, o deploy foi tentado via `az functionapp deployment source config-zip` (empacotando o código em `.zip`), mas esbarrou no `ConnectionResetError` de rede mencionado acima.
-
-`[PRINT 8 — quando o deploy for concluído: teste dos 3 endpoints públicos respondendo com dado real]`
+- ✅ Function App criada e rodando na nuvem (plano Flex Consumption, runtime Python 3.13, Linux)
+- ✅ Código com as 3 rotas HTTP (`producao-resumo`, `condicao-maquina`, `saude-linha`), credenciais via variável de ambiente (nunca hardcoded, com referência preparada para Key Vault)
+- ✅ Deploy publicado corretamente via extensão Azure Functions do VS Code, após correção do `deploySubpath`
+- ✅ Variáveis de ambiente (`SQL_USER`, `SQL_PASSWORD`) cadastradas nas Application Settings da Function App
+- ✅ As 3 rotas testadas na nuvem e respondendo com dados reais do SQL Gold, incluindo join entre produção e condição de máquina na rota combinada
 
 ---
 
