@@ -160,9 +160,121 @@ Os testes acima foram feitos pelo painel **Code + Test → Test/Run** do própri
 
 ---
 
-## Infraestrutura como Código e CI/CD
+## Infraestrutura como Código: Terraform
 
-*(planejado — módulos bônus do curso: Terraform, Docker, GitHub Actions)*
+Módulo bônus do curso, demonstrando provisionamento de infraestrutura Azure via código em vez de clique manual no Portal. O objetivo: recriar, via Terraform, dois recursos que já existem no projeto e foram criados manualmente ao longo do curso — um Storage Account com hierarquia habilitada (Data Lake Gen2) e um Key Vault — provando o mesmo padrão de forma reprodutível e versionável.
+
+O Resource Group usado (`gr_blueprint_azure_curso`) já existe e já contém todos os outros recursos do projeto; o Terraform apenas o **referencia** (bloco `data`, não `resource`), lendo suas informações sem criar, alterar ou gerenciar o grupo em si — os recursos novos (Storage Account, Container, Key Vault, Access Policy) são criados ao lado, sem interferir no que já está lá.
+
+### Código (`main.tf`)
+
+```hcl
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
+    }
+  }
+}
+
+provider "azurerm" {
+  features {}
+  skip_provider_registration = true
+}
+
+# Resource Group: ja existe, so referenciamos
+data "azurerm_resource_group" "meu_rg" {
+  name = "gr_blueprint_azure_curso"
+}
+
+# Precisamos do tenant/subscription atual pro Key Vault
+data "azurerm_client_config" "atual" {}
+
+# ---------- Data Lake (Storage Account Gen2 + Container) ----------
+resource "azurerm_storage_account" "datalake" {
+  name                     = "dltfianfava01"
+  resource_group_name      = data.azurerm_resource_group.meu_rg.name
+  location                 = data.azurerm_resource_group.meu_rg.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  is_hns_enabled           = true  # transforma o Storage Account em Data Lake Gen2
+}
+
+resource "azurerm_storage_container" "raw" {
+  name                  = "raw"
+  storage_account_name  = azurerm_storage_account.datalake.name
+  container_access_type = "private"
+}
+
+# ---------- Key Vault ----------
+resource "azurerm_key_vault" "kv" {
+  name                = "kv-tf-ianfava01"
+  resource_group_name = data.azurerm_resource_group.meu_rg.name
+  location            = data.azurerm_resource_group.meu_rg.location
+  tenant_id           = data.azurerm_client_config.atual.tenant_id
+  sku_name            = "standard"
+}
+
+resource "azurerm_key_vault_access_policy" "minha_conta" {
+  key_vault_id       = azurerm_key_vault.kv.id
+  tenant_id          = data.azurerm_client_config.atual.tenant_id
+  object_id          = data.azurerm_client_config.atual.object_id
+  secret_permissions = ["Get", "List", "Set", "Delete"]
+}
+
+# ---------- Outputs ----------
+output "storage_account_name" {
+  value = azurerm_storage_account.datalake.name
+}
+
+output "datalake_primary_endpoint" {
+  value = azurerm_storage_account.datalake.primary_dfs_endpoint
+}
+
+output "key_vault_uri" {
+  value = azurerm_key_vault.kv.vault_uri
+}
+```
+
+### Troubleshooting: registro automático de Resource Providers travando em rede
+
+Ao rodar `terraform plan` pela primeira vez, o comando parecia travado — na verdade, o provider `azurerm` estava tentando registrar automaticamente **todos** os Resource Providers que ele suporta na assinatura (dezenas deles: `Microsoft.EventHub`, `Microsoft.ContainerInstance`, `Microsoft.CognitiveServices`, entre outros que o projeto nem usa), e várias dessas chamadas de rede falhavam com `connection may have been reset`.
+
+Como os providers realmente necessários (`Microsoft.Storage`, `Microsoft.KeyVault`) já estavam registrados na assinatura — usados há semanas pelo resto do projeto —, a correção foi desativar esse registro automático desnecessário, adicionando `skip_provider_registration = true` ao bloco `provider "azurerm"` (nome do parâmetro específico da versão 3.x do provider; a partir da versão 4.x o equivalente passa a se chamar `resource_provider_registrations`).
+
+### Troubleshooting: instabilidade de rede em IPv6
+
+Mesmo após a correção acima, `terraform apply` seguiu falhando de forma intermitente em chamadas específicas (leitura do Resource Group, `listKeys` do Storage Account, leitura do Key Vault), sempre com o mesmo padrão: a chamada ficava "pendurada" por vários minutos e então falhava com erro de conexão resetada pelo host remoto. Inspecionando a mensagem de erro, os endereços envolvidos eram IPv6 — um padrão de instabilidade já observado antes neste projeto em outras chamadas de rede longas (deploy da Function App, registro de providers).
+
+A correção foi desativar o protocolo IPv6 no adaptador de rede (Configurações → Rede e Internet → Configurações avançadas de rede → propriedades do adaptador Wi-Fi → desmarcar "Protocolo IP Versão 6 (TCP/IPv6)"), forçando as conexões por IPv4. Após essa mudança, `terraform apply` completou sem nenhuma outra falha de rede.
+
+Como consequência das tentativas anteriores, o Terraform detectou que o Storage Account criado numa tentativa falha estava em estado inconsistente ("tainted") e o recriou automaticamente na aplicação seguinte — comportamento correto e esperado da ferramenta: nunca deixar um recurso em estado parcial, preferindo destruir e recriar a arriscar inconsistência.
+
+### Execução: plan → apply → confirmação → destroy
+
+**`terraform plan`** — pré-visualização das 4 ações antes de qualquer criação real:
+
+![terraform plan mostrando Plan: 4 to add, 0 to change, 0 to destroy](docs/images/15-terraform-plan.png)
+
+**`terraform apply`** — criação efetiva dos recursos, confirmada pelos 3 outputs:
+
+![terraform apply concluído com Apply complete: Resources: 2 added, 0 changed, 1 destroyed, e outputs](docs/images/16-terraform-apply.png)
+
+**Confirmação no Portal Azure** — Storage Account (`dltfianfava01`) e Key Vault (`kv-tf-ianfava01`) criados dentro do Resource Group já existente, ao lado dos demais recursos do projeto, sem interferência:
+
+![Portal Azure com os dois recursos novos destacados na lista do Resource Group](docs/images/17-portal-confirmacao.png)
+
+**`terraform destroy`** — encerramento do exercício, removendo os 4 recursos criados sem tocar no Resource Group (que foi apenas referenciado, nunca gerenciado pelo Terraform):
+
+![terraform destroy concluído com Destroy complete: Resources: 4 destroyed](docs/images/18-terraform-destroy.png)
+
+### Status atual
+
+- ✅ Módulo Terraform completo: Storage Account (Data Lake Gen2) + Container + Key Vault + Access Policy provisionados via código
+- ✅ Ciclo de vida completo testado: `init` → `plan` → `apply` → confirmação visual no Portal → `destroy`
+- ✅ Dois problemas de rede diagnosticados e documentados (registro automático de providers; instabilidade em IPv6)
+- ⬜ Docker e CI/CD (GitHub Actions): planejados como próximos módulos bônus
 
 ---
 
