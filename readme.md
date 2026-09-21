@@ -4,15 +4,30 @@
 
 ## Visão geral da arquitetura
 
-```
-Batch: CSV (raw) → Data Factory → Data Lake (RAW/BRONZE/SILVER)
-     → Synapse notebooks (PySpark) → gold.dim_* e gold.fact_producao (SQL)
+```mermaid
+flowchart TD
+    subgraph BATCH["📦 Pipeline Batch"]
+        direction LR
+        A1[CSV bruto] --> A2[Data Factory]
+        A2 --> A3[(Data Lake<br/>RAW → BRONZE → SILVER)]
+        A3 --> A4[Synapse<br/>Notebooks PySpark]
+    end
 
-Real-time: Script Python (iot_devices_industry.py) → IoT Hub → Data Explorer (modulo-fnal)
-     → gold.condicao_maquina_diaria (SQL)
+    subgraph REALTIME["📡 Pipeline Real-time"]
+        direction LR
+        B1[8 Devices IoT<br/>M01–M08] --> B2[IoT Hub]
+        B2 --> B3[(Data Explorer<br/>Telemetria bruta)]
+        B3 --> B4[Agregação diária]
+    end
 
-API: Azure Functions → 3 rotas HTTP consultando o SQL Gold
-     (producao-resumo, condicao-maquina, saude-linha)
+    A4 --> GOLD[(SQL Gold<br/>fact_producao · dim_* · condicao_maquina_diaria)]
+    B4 --> GOLD
+
+    GOLD --> API[Azure Functions<br/>API REST]
+
+    API --> R1[GET /producao-resumo]
+    API --> R2[GET /condicao-maquina]
+    API --> R3[GET /saude-linha]
 ```
 
 ---
