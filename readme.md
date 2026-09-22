@@ -1,6 +1,6 @@
 # Projeto Indústria 4.0 — Pipeline de Dados Azure
 
-> Documento de trabalho em progresso. Este arquivo vai sendo atualizado conforme novas seções (real-time, API, infraestrutura) são capturadas e documentadas.
+> Pipeline de dados completo na Azure simulando uma fábrica inteligente (Indústria 4.0): dados de produção históricos (batch) e telemetria de máquinas em tempo real são ingeridos, transformados e disponibilizados via API REST, com infraestrutura provisionada tanto manualmente quanto como código (Terraform). Projeto de portfólio em Engenharia de Dados.
 
 ## Visão geral da arquitetura
 
@@ -29,6 +29,19 @@ flowchart TD
     API --> R2[GET /condicao-maquina]
     API --> R3[GET /saude-linha]
 ```
+
+## Stack técnico
+
+| Camada | Tecnologias |
+|---|---|
+| Ingestão / Orquestração | Azure Data Factory, Azure IoT Hub |
+| Armazenamento | Azure Data Lake Storage Gen2, Azure Data Explorer (Kusto/KQL) |
+| Processamento | PySpark (Azure Synapse Spark Pool) |
+| Banco relacional | Azure SQL Database (Serverless) |
+| API | Azure Functions (Python), pymssql |
+| Segurança | Azure Key Vault |
+| Infraestrutura como Código | Terraform |
+| Linguagens | Python, SQL, PySpark, HCL |
 
 ---
 
