@@ -1,6 +1,6 @@
-# Projeto Indústria 4.0 — Pipeline de Dados Azure
+# Projeto Indústria 4.0 - Pipeline de Dados Azure
 
-> Pipeline de dados completo na Azure simulando uma fábrica inteligente (Indústria 4.0): dados de produção históricos (batch) e telemetria de máquinas em tempo real são ingeridos, transformados e disponibilizados via API REST, com infraestrutura provisionada tanto manualmente quanto como código (Terraform). Projeto de portfólio em Engenharia de Dados.
+> Pipeline de dados completo na Azure simulando uma fábrica inteligente (Indústria 4.0): dados de produção históricos (batch) e telemetria de máquinas em tempo real são ingeridos, transformados e disponibilizados via API REST, com infraestrutura provisionada tanto manualmente quanto como código (Terraform).
 
 ## Visão geral da arquitetura
 
@@ -35,13 +35,13 @@ flowchart TD
 | Camada | Tecnologias |
 |---|---|
 | Ingestão / Orquestração | Azure Data Factory, Azure IoT Hub |
-| Armazenamento | Azure Data Lake Storage Gen2, Azure Data Explorer (Kusto/KQL) |
+| Armazenamento | Azure Data Lake Storage Gen2, Azure Data Explorer |
 | Processamento | PySpark (Azure Synapse Spark Pool) |
 | Banco relacional | Azure SQL Database (Serverless) |
 | API | Azure Functions (Python), pymssql |
 | Segurança | Azure Key Vault |
 | Infraestrutura como Código | Terraform |
-| Linguagens | Python, SQL, PySpark, HCL |
+| Linguagens | Python, SQL, PySpark |
 
 ---
 
@@ -55,7 +55,7 @@ O pipeline `pl_raw_to_bronze` copia os arquivos brutos para a camada Raw do Data
 
 ![Pipeline runs no Data Factory, 3 execuções com status Succeeded](docs/images/01-pipeline-runs-data-factory.png)
 
-Além do Data Factory, o próprio Synapse orquestra um pipeline interno (`pipeline_batch_industry_4_0`) que encadeia visualmente cada etapa da transformação — leitura, metadados, processamento por linha (ForEach), e carga final via stored procedure:
+Além do Data Factory, o próprio Synapse orquestra um pipeline interno (`pipeline_batch_industry_4_0`) que encadeia visualmente cada etapa da transformação : leitura, metadados, processamento por linha (ForEach), e carga final via stored procedure:
 
 ![Visão gráfica do pipeline_batch_industry_4_0 no Synapse](docs/images/02-pipeline-grafico-synapse.png)
 
