@@ -1,10 +1,10 @@
-# Projeto Indústria 4.0 — Pipeline de Dados Azure
+# Projeto Indústria inteligente - Pipeline de Dados Azure
 
 ## 1. Problema
 
-Fábricas que operam com processos manuais de produção têm dois pontos cegos: **dados históricos de produção espalhados e não padronizados**, e **nenhuma visibilidade em tempo real sobre a condição das máquinas** — o que atrasa decisões e esconde perdas (refugo alto, máquina superaquecendo) até ser tarde demais.
+Fábricas que operam com processos manuais de produção têm dois pontos cegos: **dados históricos de produção espalhados e não padronizados** e **nenhuma visibilidade em tempo real sobre a condição das máquinas**, o que atrasa decisões e esconde perdas (refugo alto, máquina superaquecendo) até ser tarde demais.
 
-Este projeto simula uma fábrica inteligente (Indústria 4.0) que resolve os dois problemas com um único pipeline de dados na Azure: histórico de produção (CSV) é transformado num modelo dimensional consultável, telemetria de sensores (temperatura, vibração, RPM) é ingerida em tempo real, e ambos convergem numa API REST que serve indicadores de produção e saúde de máquina sob demanda.
+Este projeto simula uma fábrica inteligente que resolve os dois problemas com um único pipeline de dados na Azure: histórico de produção (CSV) é transformado num modelo dimensional consultável, telemetria de sensores (temperatura, vibração, RPM) é ingerida em tempo real, e ambos convergem numa API REST que serve indicadores de produção e saúde de máquina sob demanda.
 
 Projeto de portfólio em Engenharia de Dados, com infraestrutura provisionada tanto manualmente quanto como código (Terraform).
 
@@ -71,7 +71,7 @@ flowchart TD
 
 ## 4. Implementação
 
-### 4.1 Pipeline Batch — Raw → Bronze → Silver → Gold
+### 4.1 Pipeline Batch ( Raw → Bronze → Silver → Gold )
 
 Ingestão de dados históricos de produção (CSV), transformados progressivamente até um modelo dimensional consultável, seguindo a arquitetura medallion.
 
@@ -95,15 +95,15 @@ Ingestão de dados históricos de produção (CSV), transformados progressivamen
 
 ---
 
-### 4.2 Pipeline Real-time — IoT Hub → Data Explorer → SQL
+### 4.2 Pipeline Real-time - IoT Hub → Data Explorer → SQL
 
-Telemetria simulada de sensores (temperatura, vibração, RPM) de 8 devices (M01–M03 → Linha 1, M04–M06 → Linha 2, M07–M08 → Linha 3), ingerida via IoT Hub, armazenada em série temporal no Data Explorer, e agregada diariamente no SQL Gold.
+Telemetria simulada de sensores (temperatura, vibração, RPM) de 8 devices (M01–M03 → Linha 1, M04–M06 → Linha 2, M07–M08 → Linha 3), ingerida via IoT Hub, armazenada em série temporal no Data Explorer e agregada diariamente no SQL Gold.
 
 ![Lista de devices M01-M08 no IoT Hub, todos Enabled](docs/images/07-iot-hub-devices.png)
 ![Query KQL TelemetriaMaquinas com 10 registros reais de telemetria](docs/images/08-data-explorer-telemetria-kql.png)
 ![Query SELECT TOP 10 * FROM gold.condicao_maquina_diaria com resultado real](docs/images/09-sql-gold-condicao-maquina-diaria.png)
 
-> O cluster Data Explorer cobra por compute mesmo ocioso — fica parado (Stopped) por padrão e só é ligado sob demanda (ver incidente de custo na seção 5).
+> O cluster Data Explorer cobra por compute mesmo ocioso. Fica parado (Stopped) por padrão e só é ligado sob demanda (ver incidente de custo na seção 5).
 
 ---
 
@@ -146,9 +146,9 @@ Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código
 
 ---
 
-### 4.4 Infraestrutura como Código — Terraform
+### 4.4 Infraestrutura como Código ( Terraform )
 
-Módulo bônus: recriação via código de dois recursos que já existiam manualmente no projeto (Storage Account Data Lake Gen2 + Key Vault), provando o mesmo padrão de forma reprodutível e versionável. O Resource Group existente é apenas **referenciado** (`data`, não `resource`) — os recursos novos são criados ao lado, sem interferir no que já está lá.
+Recriação via código de dois recursos que já existiam manualmente no projeto (Storage Account Data Lake Gen2 + Key Vault), provando o mesmo padrão de forma reprodutível e versionável. O Resource Group existente é apenas **referenciado** (`data`, não `resource`) - os recursos novos são criados ao lado, sem interferir no que já está lá.
 
 **Ciclo completo testado: `init` → `plan` → `apply` → confirmação no Portal → `destroy`**
 
@@ -196,11 +196,11 @@ resource "azurerm_key_vault" "kv" {
 - ✅ Pipeline Real-time completo e testado (IoT Hub → Data Explorer → SQL Gold)
 - ✅ API publicada na nuvem, 3 rotas respondendo com dado real
 - ✅ Módulo Terraform completo (Data Lake + Key Vault via código, ciclo de vida testado)
-- ⬜ Docker e CI/CD (GitHub Actions) — próximos módulos bônus planejados
+- ⬜ Docker e CI/CD (GitHub Actions) — próxima ação planejada
 
 ### Lições aprendidas
 
-- **Segurança de credenciais:** uma senha do SQL foi identificada em texto plano num notebook Synapse durante revisão pré-publicação. Corrigido com Azure Key Vault dedicado (`kv-curso-azure`) + linked service, usando `mssparkutils.credentials.getSecretWithLS(...)` para buscar a credencial em tempo de execução — nunca escrita em nenhum arquivo do repositório. Uma tentativa anterior com `getFullConnectionString()` foi descartada por limitação da função para linked services com campos separados. Como precaução, a senha exposta será trocada.
+- **Segurança de credenciais:** uma senha do SQL foi identificada em texto plano num notebook Synapse durante revisão pré-publicação. Corrigido com Azure Key Vault dedicado (`kv-curso-azure`) + linked service, usando `mssparkutils.credentials.getSecretWithLS(...)` para buscar a credencial em tempo de execução nunca escrita em nenhum arquivo do repositório. Uma tentativa anterior com `getFullConnectionString()` foi descartada por limitação da função para linked services com campos separados. Como precaução, a senha exposta será trocada.
 - **Gestão de custo:** um incidente real de ~R$170 foi causado pelo cluster Azure Data Explorer permanecendo em estado "Running" sem uso ativo por 2 dias. Lição aplicada desde então: monitoramento ativo de recursos de compute, com o cluster parado por padrão e ligado só sob demanda.
 - **Separação de responsabilidades:** Storage Account dedicado (`stfuncindustria40`) para a Function App, isolado do Data Lake principal — decisão intencional de arquitetura, não acidente.
 
@@ -208,4 +208,4 @@ resource "azurerm_key_vault" "kv" {
 
 1. Containerização da API com Docker
 2. Pipeline de CI/CD via GitHub Actions (deploy automatizado da API e dos notebooks Synapse)
-3. Definição do formato final de apresentação do portfólio (README / LinkedIn / site pessoal)
+
