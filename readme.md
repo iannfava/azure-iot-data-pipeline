@@ -4,7 +4,7 @@
 
 Fábricas que operam com processos manuais de produção têm dois pontos cegos: **dados históricos de produção espalhados e não padronizados** e **nenhuma visibilidade em tempo real sobre a condição das máquinas**, o que atrasa decisões e esconde perdas (refugo alto, máquina superaquecendo) até ser tarde demais.
 
-Este projeto simula uma fábrica inteligente que resolve os dois problemas com um único pipeline de dados na Azure: histórico de produção (CSV) é transformado num modelo dimensional consultável, telemetria de sensores (temperatura, vibração, RPM) é ingerida em tempo real, e ambos convergem numa API REST que serve indicadores de produção e saúde de máquina sob demanda.
+Este projeto simula uma fábrica inteligente que resolve os dois problemas com um único pipeline de dados na Azure, seguindo arquitetura **ELT** (Extract, Load, Transform — o dado bruto é carregado primeiro, e transformado em etapas dentro do próprio Data Lake): histórico de produção (CSV) é transformado num modelo dimensional consultável, telemetria de sensores (temperatura, vibração, RPM) é ingerida em tempo real, e ambos convergem numa API REST que serve indicadores de produção e saúde de máquina sob demanda.
 
 Projeto de portfólio em Engenharia de Dados, com infraestrutura provisionada tanto manualmente quanto como código (Terraform).
 
@@ -117,7 +117,7 @@ Azure Function App (`blueprint-azure`, Flex Consumption, Linux, Python 3.13) com
 - `GET /api/condicao-maquina?id_maquina=M01` — última leitura de condição de uma máquina
 - `GET /api/saude-linha?linha=L1` — visão combinada produção + condição
 
-Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código já preparado para referência direta ao Key Vault (`@Microsoft.KeyVault(SecretUri=...)`).
+Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código já preparado para referência direta ao Key Vault (`@Microsoft.KeyVault(SecretUri=...)`). Todas as queries usam parâmetros (`%s` via `pymssql`) em vez de concatenação de string, prevenindo SQL Injection.
 
 **As 3 rotas respondendo com dado real na nuvem:**
 
@@ -207,6 +207,12 @@ resource "azurerm_key_vault" "kv" {
 - **Segurança de credenciais:** uma senha do SQL foi identificada em texto plano num notebook Synapse durante revisão pré-publicação. Corrigido com Azure Key Vault dedicado (`kv-curso-azure`) + linked service, usando `mssparkutils.credentials.getSecretWithLS(...)` para buscar a credencial em tempo de execução nunca escrita em nenhum arquivo do repositório. Uma tentativa anterior com `getFullConnectionString()` foi descartada por limitação da função para linked services com campos separados. Como precaução, a senha exposta será trocada.
 - **Gestão de custo:** um incidente real de ~R$170 foi causado pelo cluster Azure Data Explorer permanecendo em estado "Running" sem uso ativo por 2 dias. Lição aplicada desde então: monitoramento ativo de recursos de compute, com o cluster parado por padrão e ligado só sob demanda.
 - **Separação de responsabilidades:** Storage Account dedicado (`stfuncindustria40`) para a Function App, isolado do Data Lake principal — decisão intencional de arquitetura, não acidente.
+
+### Limitações conhecidas
+
+- **Sem testes automatizados**: nenhuma camada (notebooks, API, Terraform) tem testes unitários ou de integração — a validação foi manual, conferindo prints e resultados de query a cada execução. Automatizar isso (ex: `pytest` para a API) é o próximo investimento de qualidade.
+- **Assimetria de validação entre os dois pipelines**: o pipeline Batch tem tratamento explícito de qualidade (schema definido, flag de duração inválida, deduplicação por chave de negócio). O pipeline Real-time ainda não tem uma camada equivalente de validação antes de gravar no Data Explorer.
+- **Terraform cobre só um exercício isolado**: o módulo recriou Storage Account + Key Vault como prova de conceito, em recursos próprios já destruídos — a infraestrutura real do projeto (Data Factory, Synapse, SQL, IoT Hub) ainda é provisionada manualmente. Migrar isso é um próximo passo natural, não coberto ainda.
 
 ### Próximos passos
 
