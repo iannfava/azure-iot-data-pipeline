@@ -18,6 +18,7 @@ flowchart TD
     classDef realtime fill:#4a2c5e,stroke:#a855c7,stroke-width:2px,color:#fff
     classDef gold fill:#5e4a1e,stroke:#d9a84a,stroke-width:3px,color:#fff
     classDef api fill:#1e5e3a,stroke:#4ad98f,stroke-width:2px,color:#fff
+    classDef iac fill:#3a3a3a,stroke:#888,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
 
     subgraph BATCH["📦 PIPELINE BATCH"]
         direction LR
@@ -42,15 +43,16 @@ flowchart TD
     API --> R2[GET /condicao-maquina]
     API --> R3[GET /saude-linha]
 
-    IAC["🏗️ Terraform<br/>Data Lake + Key Vault via código"] -.provisiona.-> A3
+    IAC["🏗️ Terraform<br/>(exercício isolado — Data Lake + Key Vault<br/>próprios, já destruídos)"]
 
     class A1,A2,A3,A4 batch
     class B1,B2,B3,B4 realtime
     class GOLD gold
     class API,R1,R2,R3 api
+    class IAC iac
 ```
 
-**Fluxo em uma frase:** dois pipelines independentes (batch e real-time) alimentam o mesmo modelo dimensional no SQL Server (camada Gold), que é exposto ao mundo externo por uma API REST serverless.
+**Fluxo em uma frase:** dois pipelines independentes (batch e real-time) alimentam o mesmo modelo dimensional no SQL Server (camada Gold), que é exposto ao mundo externo por uma API REST serverless. O bloco de Terraform (cinza, tracejado) é um exercício isolado — não alimenta o pipeline real.
 
 ---
 
@@ -150,6 +152,8 @@ Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código
 
 Recriação via código de dois recursos que já existiam manualmente no projeto (Storage Account Data Lake Gen2 + Key Vault), provando o mesmo padrão de forma reprodutível e versionável. O Resource Group existente é apenas **referenciado** (`data`, não `resource`) - os recursos novos são criados ao lado, sem interferir no que já está lá.
 
+> Exercício isolado: os recursos criados aqui (`dltfianfava01`, `kv-tf-ianfava01`) são separados do Data Lake e Key Vault reais do projeto — servem só para provar o padrão via código, e já foram destruídos ao final (ver `terraform destroy` abaixo).
+
 **Ciclo completo testado: `init` → `plan` → `apply` → confirmação no Portal → `destroy`**
 
 ![terraform plan mostrando Plan: 4 to add, 0 to change, 0 to destroy](docs/images/15-terraform-plan.png)
@@ -208,4 +212,3 @@ resource "azurerm_key_vault" "kv" {
 
 1. Containerização da API com Docker
 2. Pipeline de CI/CD via GitHub Actions (deploy automatizado da API e dos notebooks Synapse)
-
