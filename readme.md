@@ -2,9 +2,9 @@
 
 ## 1. Problema
 
-Fábricas que operam com processos manuais de produção têm dois pontos cegos: **dados históricos de produção espalhados e não padronizados** e **nenhuma visibilidade em tempo real sobre a condição das máquinas**, o que atrasa decisões e esconde perdas (refugo alto, máquina superaquecendo) até ser tarde demais.
+Fábricas que operam com processos manuais de produção têm dois probelmas: **dados históricos de produção espalhados e não padronizados** e **nenhuma visibilidade em tempo real sobre a condição das máquinas**, o que atrasa decisões e esconde perdas (refugo alto, máquina superaquecendo).
 
-Este projeto simula uma fábrica inteligente que resolve os dois problemas com um único pipeline de dados na Azure, seguindo arquitetura **ELT** (Extract, Load, Transform — o dado bruto é carregado primeiro, e transformado em etapas dentro do próprio Data Lake): histórico de produção (CSV) é transformado num modelo dimensional consultável, telemetria de sensores (temperatura, vibração, RPM) é ingerida em tempo real, e ambos convergem numa API REST que serve indicadores de produção e saúde de máquina sob demanda.
+Este projeto simula uma fábrica inteligente que resolve os dois problemas com um único pipeline de dados na Azure, seguindo arquitetura **ELT** (Extract, Load, Transform: o dado bruto é carregado primeiro, e transformado em etapas dentro do próprio Data Lake): histórico de produção (CSV) é transformado num modelo dimensional consultável, telemetria de sensores (temperatura, vibração, RPM) é ingerida em tempo real, e ambos convergem numa API REST que serve indicadores de produção e saúde de máquina sob demanda.
 
 Projeto de portfólio em Engenharia de Dados, com infraestrutura provisionada tanto manualmente quanto como código (Terraform).
 
@@ -52,7 +52,7 @@ flowchart TD
     class IAC iac
 ```
 
-**Fluxo em uma frase:** dois pipelines independentes (batch e real-time) alimentam o mesmo modelo dimensional no SQL Server (camada Gold), que é exposto ao mundo externo por uma API REST serverless. O bloco de Terraform (cinza, tracejado) é um exercício isolado — não alimenta o pipeline real.
+**Fluxo** dois pipelines independentes (batch e real-time) alimentam o mesmo modelo no SQL Server (camada Gold), que é exposto por uma API REST serverless. O bloco de Terraform (cinza, tracejado) é um exercício isolado, não alimenta o pipeline real.
 
 ---
 
@@ -97,7 +97,7 @@ Ingestão de dados históricos de produção (CSV), transformados progressivamen
 
 ---
 
-### 4.2 Pipeline Real-time - IoT Hub → Data Explorer → SQL
+### 4.2 Pipeline Real-time: IoT Hub → Data Explorer → SQL
 
 Telemetria simulada de sensores (temperatura, vibração, RPM) de 8 devices (M01–M03 → Linha 1, M04–M06 → Linha 2, M07–M08 → Linha 3), ingerida via IoT Hub, armazenada em série temporal no Data Explorer e agregada diariamente no SQL Gold.
 
@@ -113,11 +113,11 @@ Telemetria simulada de sensores (temperatura, vibração, RPM) de 8 devices (M01
 
 Azure Function App (`blueprint-azure`, Flex Consumption, Linux, Python 3.13) com 3 rotas HTTP consultando o SQL Gold via `pymssql`:
 
-- `GET /api/producao-resumo?linha=L1` — resumo de produção por linha
-- `GET /api/condicao-maquina?id_maquina=M01` — última leitura de condição de uma máquina
-- `GET /api/saude-linha?linha=L1` — visão combinada produção + condição
+- `GET /api/producao-resumo?linha=L1` : resumo de produção por linha
+- `GET /api/condicao-maquina?id_maquina=M01` : última leitura de condição de uma máquina
+- `GET /api/saude-linha?linha=L1` : visão combinada produção + condição
 
-Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código já preparado para referência direta ao Key Vault (`@Microsoft.KeyVault(SecretUri=...)`). Todas as queries usam parâmetros (`%s` via `pymssql`) em vez de concatenação de string, prevenindo SQL Injection.
+Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código já preparado para referência direta ao Key Vault (`@Microsoft.KeyVault(SecretUri=...)`). Todas as queries usam parâmetros (`%s` via `pymssql`) para previnir SQL Injection.
 
 **As 3 rotas respondendo com dado real na nuvem:**
 
@@ -130,7 +130,7 @@ Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código
 
 **1. Portal sem opção de plano compatível.** O plano clássico Consumption (Linux) sumiu do formulário visual do portal, restando só "Flex Consumption" (bloqueado em conta Free Trial) e "Consumption (Windows)" (sem suporte a Python). Diagnosticado com `az functionapp create --debug`: erro de rede numa chamada que baixa um catálogo grande (`functionAppStacks`). Resolvido com upgrade da assinatura para Pay-As-You-Go, o que também destravou o Flex Consumption.
 
-**2. Deploy publicando o projeto errado.** O workspace tinha duas pastas de function app (a real e uma de exemplo de aula). Mesmo com a pasta certa marcada como padrão na extensão do VS Code, o deploy insistia em publicar a errada. Causa raiz: `.vscode/settings.json` tem duas chaves distintas — `projectSubpath` (qual pasta o workspace reconhece) e `deploySubpath` (qual pasta é de fato publicada) — e a segunda estava presa no valor antigo:
+**2. Deploy publicando o projeto errado.** O workspace tinha duas pastas de function app (a real e uma de exemplo de aula). Mesmo com a pasta certa marcada como padrão na extensão do VS Code, o deploy insistia em publicar a errada. Causa raiz: `.vscode/settings.json` tem duas chaves distintas — `projectSubpath` (qual pasta o workspace reconhece) e `deploySubpath` (qual pasta é de fato publicada), e a segunda estava presa no valor antigo:
 
 ```jsonc
 // antes
@@ -142,7 +142,7 @@ Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código
 ![Function App só com a rota de exemplo publicada](docs/images/10-api-antes-deploy-errado.png)
 ![Function App com as 3 rotas reais publicadas](docs/images/11-api-depois-deploy-correto.png)
 
-**3. Erro 500 por variáveis de ambiente ausentes na nuvem.** Com o código certo publicado, as 3 rotas retornavam erro 500. O `SQL_USER`/`SQL_PASSWORD` não têm valor padrão no código (diferente de `SQL_SERVER`/`SQL_DATABASE`) e a Function App na nuvem não tinha essas variáveis cadastradas — só as de infraestrutura criadas automaticamente pelo Azure. Resolvido cadastrando as variáveis em **Function App → Settings → Environment variables**.
+**3. Erro 500 por variáveis de ambiente ausentes na nuvem.** Com o código certo publicado, as 3 rotas retornavam erro 500. O `SQL_USER`/`SQL_PASSWORD` não têm valor padrão no código (diferente de `SQL_SERVER`/`SQL_DATABASE`) e a Function App na nuvem não tinha essas variáveis cadastradas, só as de infraestrutura criadas automaticamente pela Azure. Resolvido cadastrando as variáveis em **Function App → Settings → Environment variables**.
 
 </details>
 
@@ -152,7 +152,7 @@ Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código
 
 Recriação via código de dois recursos que já existiam manualmente no projeto (Storage Account Data Lake Gen2 + Key Vault), provando o mesmo padrão de forma reprodutível e versionável. O Resource Group existente é apenas **referenciado** (`data`, não `resource`) - os recursos novos são criados ao lado, sem interferir no que já está lá.
 
-> Exercício isolado: os recursos criados aqui (`dltfianfava01`, `kv-tf-ianfava01`) são separados do Data Lake e Key Vault reais do projeto — servem só para provar o padrão via código, e já foram destruídos ao final (ver `terraform destroy` abaixo).
+> Exercício isolado: os recursos criados aqui (`dltfianfava01`, `kv-tf-ianfava01`) são separados do Data Lake e Key Vault reais do projeto e servem só para provar o padrão via código, e já foram destruídos ao final (ver `terraform destroy` abaixo).
 
 **Ciclo completo testado: `init` → `plan` → `apply` → confirmação no Portal → `destroy`**
 
@@ -166,7 +166,7 @@ Recriação via código de dois recursos que já existiam manualmente no projeto
 
 **1. Registro automático de Resource Providers travando em rede.** O provider `azurerm` tenta registrar automaticamente **todos** os Resource Providers que suporta (dezenas, incluindo vários que o projeto nem usa), e várias dessas chamadas falhavam com `connection may have been reset`. Resolvido com `skip_provider_registration = true` no bloco do provider, já que os providers realmente necessários (`Storage`, `KeyVault`) já estavam registrados.
 
-**2. Instabilidade de rede em IPv6.** Mesmo após a correção acima, `terraform apply` seguia falhando de forma intermitente (leitura do Resource Group, `listKeys`, leitura do Key Vault) — sempre travando por minutos e caindo com conexão resetada. Os endereços na mensagem de erro eram IPv6. Corrigido desativando o protocolo IPv6 no adaptador de rede, forçando IPv4. Como efeito colateral, o Terraform detectou um recurso em estado "tainted" de uma tentativa anterior e o recriou automaticamente — comportamento correto e esperado da ferramenta.
+**2. Instabilidade de rede em IPv6.** Mesmo após a correção acima, `terraform apply` seguia falhando(leitura do Resource Group, `listKeys`, leitura do Key Vault), sempre travando por minutos e caindo com conexão resetada. Os endereços na mensagem de erro eram IPv6. Corrigi desativando o protocolo IPv6 no adaptador de rede, forçando IPv4. Como efeito colateral, o Terraform detectou um recurso em estado "tainted" de uma tentativa anterior e o recriou automaticamente. 
 
 ```hcl
 # main.tf — trecho principal
@@ -200,13 +200,12 @@ resource "azurerm_key_vault" "kv" {
 - ✅ Pipeline Real-time completo e testado (IoT Hub → Data Explorer → SQL Gold)
 - ✅ API publicada na nuvem, 3 rotas respondendo com dado real
 - ✅ Módulo Terraform completo (Data Lake + Key Vault via código, ciclo de vida testado)
-- ⬜ Docker e CI/CD (GitHub Actions) — próxima ação planejada
 
 ### Lições aprendidas
 
-- **Segurança de credenciais:** uma senha do SQL foi identificada em texto plano num notebook Synapse durante revisão pré-publicação. Corrigido com Azure Key Vault dedicado (`kv-curso-azure`) + linked service, usando `mssparkutils.credentials.getSecretWithLS(...)` para buscar a credencial em tempo de execução nunca escrita em nenhum arquivo do repositório. Uma tentativa anterior com `getFullConnectionString()` foi descartada por limitação da função para linked services com campos separados. Como precaução, a senha exposta será trocada.
+- **Segurança de credenciais:** uma senha do SQL foi identificada em texto num notebook Synapse durante revisão pré-publicação. Corrigido com Azure Key Vault dedicado (`kv-curso-azure`) + linked service, usando `mssparkutils.credentials.getSecretWithLS(...)` para buscar a credencial em tempo de execução nunca escrita em nenhum arquivo do repositório. Uma tentativa anterior com `getFullConnectionString()` foi descartada por limitação da função para linked services com campos separados. Como precaução, a senha exposta será trocada.
 - **Gestão de custo:** um incidente real de ~R$170 foi causado pelo cluster Azure Data Explorer permanecendo em estado "Running" sem uso ativo por 2 dias. Lição aplicada desde então: monitoramento ativo de recursos de compute, com o cluster parado por padrão e ligado só sob demanda.
-- **Separação de responsabilidades:** Storage Account dedicado (`stfuncindustria40`) para a Function App, isolado do Data Lake principal — decisão intencional de arquitetura, não acidente.
+- **Separação de responsabilidades:** Storage Account dedicado (`stfuncindustria40`) para a Function App, isolado do Data Lake principal, que foi uma decisãode arquitetura.
 
 ### Limitações conhecidas e próximos passos
 
