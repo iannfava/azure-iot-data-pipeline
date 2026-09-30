@@ -203,7 +203,7 @@ resource "azurerm_key_vault" "kv" {
 
 ### Lições aprendidas
 
-- **Segurança de credenciais:** uma senha do SQL foi identificada em texto num notebook Synapse durante revisão pré-publicação. Corrigido com Azure Key Vault dedicado (`kv-curso-azure`) + linked service, usando `mssparkutils.credentials.getSecretWithLS(...)` para buscar a credencial em tempo de execução nunca escrita em nenhum arquivo do repositório. Uma tentativa anterior com `getFullConnectionString()` foi descartada por limitação da função para linked services com campos separados. Como precaução, a senha exposta será trocada.
+- **Segurança de credenciais:** uma senha do SQL foi identificada em texto num notebook Synapse durante revisão pré-publicação. Corrigido com Azure Key Vault dedicado (`kv-curso-azure`) + linked service, usando `mssparkutils.credentials.getSecretWithLS(...)` para buscar a credencial em tempo de execução nunca escrita em nenhum arquivo do repositório.
 - **Gestão de custo:** um incidente real de ~R$170 foi causado pelo cluster Azure Data Explorer permanecendo em estado "Running" sem uso ativo por 2 dias. Lição aplicada desde então: monitoramento ativo de recursos de compute, com o cluster parado por padrão e ligado só sob demanda.
 - **Separação de responsabilidades:** Storage Account dedicado (`stfuncindustria40`) para a Function App, isolado do Data Lake principal, que foi uma decisãode arquitetura.
 
