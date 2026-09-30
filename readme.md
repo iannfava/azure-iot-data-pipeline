@@ -162,11 +162,9 @@ Recriação via código de dois recursos que já existiam manualmente no projeto
 ![terraform destroy concluído com Destroy complete: Resources: 4 destroyed](docs/images/18-terraform-destroy.png)
 
 <details>
-<summary><strong>🔧 Troubleshooting: 2 problemas de rede diagnosticados (clique para expandir)</strong></summary>
+<summary><strong>🔧 Troubleshooting: Problema de rede diagnosticados (clique para expandir)</strong></summary>
 
-**1. Registro automático de Resource Providers travando em rede.** O provider `azurerm` tenta registrar automaticamente **todos** os Resource Providers que suporta (dezenas, incluindo vários que o projeto nem usa), e várias dessas chamadas falhavam com `connection may have been reset`. Resolvido com `skip_provider_registration = true` no bloco do provider, já que os providers realmente necessários (`Storage`, `KeyVault`) já estavam registrados.
-
-**2. Instabilidade de rede em IPv6.** Mesmo após a correção acima, `terraform apply` seguia falhando(leitura do Resource Group, `listKeys`, leitura do Key Vault), sempre travando por minutos e caindo com conexão resetada. Os endereços na mensagem de erro eram IPv6. Corrigi desativando o protocolo IPv6 no adaptador de rede, forçando IPv4. Como efeito colateral, o Terraform detectou um recurso em estado "tainted" de uma tentativa anterior e o recriou automaticamente. 
+**Instabilidade de rede em IPv6.** Mesmo após a correção acima, `terraform apply` seguia falhando(leitura do Resource Group, `listKeys`, leitura do Key Vault), sempre travando por minutos e caindo com conexão resetada. Os endereços na mensagem de erro eram IPv6. Corrigi desativando o protocolo IPv6 no adaptador de rede, forçando IPv4. Como efeito colateral, o Terraform detectou um recurso em estado "tainted" de uma tentativa anterior e o recriou automaticamente. 
 
 ```hcl
 # main.tf — trecho principal
