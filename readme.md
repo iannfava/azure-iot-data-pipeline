@@ -126,23 +126,11 @@ Credenciais nunca em texto plano: lidas de variáveis de ambiente, com o código
 ![Teste da rota saude-linha retornando 200 OK](docs/images/14-api-teste-saude-linha.png)
 
 <details>
-<summary><strong>🔧 Troubleshooting: 3 problemas reais resolvidos no caminho até a API funcionar (clique para expandir)</strong></summary>
+<summary><strong>🔧 Troubleshooting: 2 problemas reais resolvidos no caminho até a API funcionar (clique para expandir)</strong></summary>
 
 **1. Portal sem opção de plano compatível.** O plano clássico Consumption (Linux) sumiu do formulário visual do portal, restando só "Flex Consumption" (bloqueado em conta Free Trial) e "Consumption (Windows)" (sem suporte a Python). Diagnosticado com `az functionapp create --debug`: erro de rede numa chamada que baixa um catálogo grande (`functionAppStacks`). Resolvido com upgrade da assinatura para Pay-As-You-Go, o que também destravou o Flex Consumption.
 
-**2. Deploy publicando o projeto errado.** O workspace tinha duas pastas de function app (a real e uma de exemplo de aula). Mesmo com a pasta certa marcada como padrão na extensão do VS Code, o deploy insistia em publicar a errada. Causa raiz: `.vscode/settings.json` tem duas chaves distintas — `projectSubpath` (qual pasta o workspace reconhece) e `deploySubpath` (qual pasta é de fato publicada), e a segunda estava presa no valor antigo:
-
-```jsonc
-// antes
-"azureFunctions.deploySubpath": "api_function_project"
-// depois
-"azureFunctions.deploySubpath": "api_projeto_final"
-```
-
-![Function App só com a rota de exemplo publicada](docs/images/10-api-antes-deploy-errado.png)
-![Function App com as 3 rotas reais publicadas](docs/images/11-api-depois-deploy-correto.png)
-
-**3. Erro 500 por variáveis de ambiente ausentes na nuvem.** Com o código certo publicado, as 3 rotas retornavam erro 500. O `SQL_USER`/`SQL_PASSWORD` não têm valor padrão no código (diferente de `SQL_SERVER`/`SQL_DATABASE`) e a Function App na nuvem não tinha essas variáveis cadastradas, só as de infraestrutura criadas automaticamente pela Azure. Resolvido cadastrando as variáveis em **Function App → Settings → Environment variables**.
+**2. Erro 500 por variáveis de ambiente ausentes na nuvem.** Com o código certo publicado, as 3 rotas retornavam erro 500. O `SQL_USER`/`SQL_PASSWORD` não têm valor padrão no código (diferente de `SQL_SERVER`/`SQL_DATABASE`) e a Function App na nuvem não tinha essas variáveis cadastradas, só as de infraestrutura criadas automaticamente pela Azure. Resolvido cadastrando as variáveis em **Function App → Settings → Environment variables**.
 
 </details>
 
@@ -162,7 +150,7 @@ Recriação via código de dois recursos que já existiam manualmente no projeto
 ![terraform destroy concluído com Destroy complete: Resources: 4 destroyed](docs/images/18-terraform-destroy.png)
 
 <details>
-<summary><strong>🔧 Troubleshooting: Problema de rede diagnosticados (clique para expandir)</strong></summary>
+<summary><strong>🔧 Troubleshooting: Problema de rede diagnosticado(clique para expandir)</strong></summary>
 
 **Instabilidade de rede em IPv6.** Mesmo após a correção acima, `terraform apply` seguia falhando(leitura do Resource Group, `listKeys`, leitura do Key Vault), sempre travando por minutos e caindo com conexão resetada. Os endereços na mensagem de erro eram IPv6. Corrigi desativando o protocolo IPv6 no adaptador de rede, forçando IPv4. Como efeito colateral, o Terraform detectou um recurso em estado "tainted" de uma tentativa anterior e o recriou automaticamente. 
 
