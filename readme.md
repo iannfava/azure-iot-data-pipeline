@@ -168,8 +168,6 @@ Recriação via código de dois recursos que já existiam manualmente no projeto
 
 **2. Instabilidade de rede em IPv6.** Mesmo após a correção acima, `terraform apply` seguia falhando de forma intermitente (leitura do Resource Group, `listKeys`, leitura do Key Vault) — sempre travando por minutos e caindo com conexão resetada. Os endereços na mensagem de erro eram IPv6. Corrigido desativando o protocolo IPv6 no adaptador de rede, forçando IPv4. Como efeito colateral, o Terraform detectou um recurso em estado "tainted" de uma tentativa anterior e o recriou automaticamente — comportamento correto e esperado da ferramenta.
 
-</details>
-
 ```hcl
 # main.tf — trecho principal
 resource "azurerm_storage_account" "datalake" {
@@ -190,6 +188,8 @@ resource "azurerm_key_vault" "kv" {
 }
 ```
 
+</details>
+
 ---
 
 ## 5. Resultados, aprendizados e próximos passos
@@ -208,13 +208,10 @@ resource "azurerm_key_vault" "kv" {
 - **Gestão de custo:** um incidente real de ~R$170 foi causado pelo cluster Azure Data Explorer permanecendo em estado "Running" sem uso ativo por 2 dias. Lição aplicada desde então: monitoramento ativo de recursos de compute, com o cluster parado por padrão e ligado só sob demanda.
 - **Separação de responsabilidades:** Storage Account dedicado (`stfuncindustria40`) para a Function App, isolado do Data Lake principal — decisão intencional de arquitetura, não acidente.
 
-### Limitações conhecidas
+### Limitações conhecidas e próximos passos
 
-- **Sem testes automatizados**: nenhuma camada (notebooks, API, Terraform) tem testes unitários ou de integração — a validação foi manual, conferindo prints e resultados de query a cada execução. Automatizar isso (ex: `pytest` para a API) é o próximo investimento de qualidade.
-- **Assimetria de validação entre os dois pipelines**: o pipeline Batch tem tratamento explícito de qualidade (schema definido, flag de duração inválida, deduplicação por chave de negócio). O pipeline Real-time ainda não tem uma camada equivalente de validação antes de gravar no Data Explorer.
-- **Terraform cobre só um exercício isolado**: o módulo recriou Storage Account + Key Vault como prova de conceito, em recursos próprios já destruídos — a infraestrutura real do projeto (Data Factory, Synapse, SQL, IoT Hub) ainda é provisionada manualmente. Migrar isso é um próximo passo natural, não coberto ainda.
-
-### Próximos passos
-
-1. Containerização da API com Docker
-2. Pipeline de CI/CD via GitHub Actions (deploy automatizado da API e dos notebooks Synapse)
+- **Sem testes automatizados** → adicionar testes unitários/integração (ex: `pytest` para a API)
+- **Assimetria de validação entre os pipelines** → aplicar ao Real-time o mesmo rigor de qualidade que o Batch já tem (schema, flags de erro, dedup)
+- **Terraform cobre só um exercício isolado** → migrar a infraestrutura real do projeto (hoje manual) para Terraform
+- **Containerização da API** → Docker
+- **Automação de deploy** → CI/CD via GitHub Actions
